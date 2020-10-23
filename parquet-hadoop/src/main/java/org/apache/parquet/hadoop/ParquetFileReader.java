@@ -703,6 +703,67 @@ public class ParquetFileReader implements Closeable {
     this.crc = options.usePageChecksumVerification() ? new CRC32() : null;
   }
 
+  public static class BlockStats {
+    BlockMetaData block;
+    HashMap<ColumnPath, ColumnIndex> columnIdxs = new HashMap<>();
+    HashMap<ColumnPath, OffsetIndex> columnOffs = new HashMap<>();
+
+    public BlockStats(BlockMetaData block) {
+      this.block = block;
+    }
+
+    public void addColumnIndex(ColumnPath col, ColumnIndex idx) {
+      columnIdxs.put(col, idx);
+    }
+
+    public void addColumnOffsets(ColumnPath col, OffsetIndex off) {
+      columnOffs.put(col, off);
+    }
+  }
+
+  public ParquetFileReader(InputFile file, ParquetReadOptions options, ParquetMetadata footer,
+                           List<BlockStats> blocks)
+    throws IOException
+  {
+    this.converter = new ParquetMetadataConverter(options);
+    this.file = file;
+    this.f = file.newStream();
+    this.options = options;
+    this.footer = footer;
+    this.fileMetaData = footer.getFileMetaData();
+    List<BlockMetaData> tblocks = new ArrayList<>(blocks.size());
+    for (BlockStats blockStats : blocks)
+      tblocks.add(blockStats.block);
+    this.blocks = filterRowGroups(tblocks);
+    this.blockIndexStores = listWithNulls(this.blocks.size());
+    // FIXME what if filter removes extra blocks???
+    for (int i=0; i < this.blocks.size(); i++) {
+      BlockStats bsi = blocks.get(i);
+      this.blockIndexStores.add(i, ColumnIndexStoreImpl.create(this, bsi));
+    }
+    this.blockRowRanges = listWithNulls(this.blocks.size());
+    for (ColumnDescriptor col : footer.getFileMetaData().getSchema().getColumns()) {
+      paths.put(ColumnPath.get(col.getPath()), col);
+    }
+    this.crc = options.usePageChecksumVerification() ? new CRC32() : null;
+  }
+
+  public ParquetFileReader(InputFile file, ParquetReadOptions options, ParquetMetadata footer) throws IOException {
+    this.converter = new ParquetMetadataConverter(options);
+    this.file = file;
+    this.f = file.newStream();
+    this.options = options;
+    this.footer = footer;
+    this.fileMetaData = footer.getFileMetaData();
+    this.blocks = filterRowGroups(footer.getBlocks());
+    this.blockIndexStores = listWithNulls(this.blocks.size());
+    this.blockRowRanges = listWithNulls(this.blocks.size());
+    for (ColumnDescriptor col : footer.getFileMetaData().getSchema().getColumns()) {
+      paths.put(ColumnPath.get(col.getPath()), col);
+    }
+    this.crc = options.usePageChecksumVerification() ? new CRC32() : null;
+  }
+
   public ParquetFileReader(InputFile file, ParquetReadOptions options) throws IOException {
     this.converter = new ParquetMetadataConverter(options);
     this.file = file;

@@ -51,6 +51,13 @@ class ColumnIndexStoreImpl implements ColumnIndexStore {
     private boolean columnIndexRead;
     private final OffsetIndex offsetIndex;
 
+    IndexStoreImpl(ColumnChunkMetaData meta, OffsetIndex oi, ColumnIndex ci) {
+      this.meta = meta;
+      this.offsetIndex = oi;
+      this.columnIndex = ci;
+      this.columnIndexRead = true;
+    }
+
     IndexStoreImpl(ColumnChunkMetaData meta) {
       this.meta = meta;
       OffsetIndex oi;
@@ -129,6 +136,14 @@ class ColumnIndexStoreImpl implements ColumnIndexStore {
     }
   }
 
+  static ColumnIndexStore create(ParquetFileReader reader, ParquetFileReader.BlockStats blockStats) {
+    try {
+      return new ColumnIndexStoreImpl(reader, blockStats);
+    } catch (MissingOffsetIndexException e) {
+      return EMPTY;
+    }
+  }
+
   private ColumnIndexStoreImpl(ParquetFileReader reader, BlockMetaData block, Set<ColumnPath> paths) {
     // TODO[GS]: Offset index for every paths will be required; pre-read the consecutive ones at once?
     // TODO[GS]: Pre-read column index based on filter?
@@ -139,6 +154,16 @@ class ColumnIndexStoreImpl implements ColumnIndexStore {
       if (paths.contains(path)) {
         store.put(path, new IndexStoreImpl(column));
       }
+    }
+    this.store = store;
+  }
+
+  private ColumnIndexStoreImpl(ParquetFileReader reader, ParquetFileReader.BlockStats blockStats) {
+    this.reader = reader;
+    Map<ColumnPath, IndexStore> store = new HashMap<>();
+    for (ColumnChunkMetaData column : blockStats.block.getColumns()) {
+      ColumnPath path = column.getPath();
+      store.put(path, new IndexStoreImpl(column, blockStats.columnOffs.get(path), blockStats.columnIdxs.get(path)));
     }
     this.store = store;
   }
