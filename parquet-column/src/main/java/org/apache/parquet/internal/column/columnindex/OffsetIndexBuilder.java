@@ -40,10 +40,20 @@ public class OffsetIndexBuilder {
     @Override
     public String toString() {
       try (Formatter formatter = new Formatter()) {
-        formatter.format("%-10s  %20s  %16s  %20s\n", "", "offset", "compressed size", "first row index");
-        for (int i = 0, n = offsets.length; i < n; ++i) {
-          formatter.format("page-%-5d  %20d  %16d  %20d\n", i, offsets[i], compressedPageSizes[i], firstRowIndexes[i]);
+        if (unencodedByteArrayDataBytes != null && unencodedByteArrayDataBytes.length == offsets.length) {
+          formatter.format(
+            "%-10s  %20s  %16s  %20s  %20s\n", "", "offset", "compressed size", "first row index", "unencoded size");
+          for (int i = 0, n = offsets.length; i < n; ++i) {
+            formatter.format("page-%-5d  %20d  %16d  %20d  %20d\n", i, offsets[i], compressedPageSizes[i],
+              firstRowIndexes[i], unencodedByteArrayDataBytes[i]);
+          }
+        } else {
+          formatter.format("%-10s  %20s  %16s  %20s\n", "", "offset", "compressed size", "first row index");
+          for (int i = 0, n = offsets.length; i < n; ++i) {
+            formatter.format("page-%-5d  %20d  %16d  %20d\n", i, offsets[i], compressedPageSizes[i], firstRowIndexes[i]);
+          }
         }
+
         return formatter.toString();
       }
     }

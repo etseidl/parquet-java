@@ -204,6 +204,28 @@ public abstract class ColumnIndexBuilder {
           }
           formatter.format(format, i, nullCount, min, max);
         }
+        if (defLevelHistogram != null && defLevelHistogram.length > 0) {
+          int nlevel = defLevelHistogram.length / nullPages.length;
+          formatter.format("\nDefinition Level Histograms\n");
+          for (int i = 0; i < defLevelHistogram.length; i += nlevel) {
+            formatter.format("page-%-5d  [", i);
+            for (int j = 0; j < nlevel; j++) {
+              formatter.format("%d,", defLevelHistogram[i + j]);
+            }
+            formatter.format("]\n");
+          }
+        }
+        if (repLevelHistogram != null && repLevelHistogram.length > 0) {
+          int nlevel = repLevelHistogram.length / nullPages.length;
+          formatter.format("\nRepetition Level Histograms\n");
+          for (int i = 0; i < repLevelHistogram.length; i += nlevel) {
+            formatter.format("page-%-5d  [", i);
+            for (int j = 0; j < nlevel; j++) {
+              formatter.format("%d,", repLevelHistogram[i + j]);
+            }
+            formatter.format("]\n");
+          }
+        }
         return formatter.toString();
       }
     }
