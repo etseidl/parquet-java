@@ -25,6 +25,7 @@ import java.io.IOException;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.page.PageWriter;
+import org.apache.parquet.column.statistics.SizeStatistics;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.column.values.ValuesWriter;
 import org.apache.parquet.column.values.bloomfilter.BloomFilterWriter;
@@ -55,7 +56,7 @@ final class ColumnWriterV1 extends ColumnWriterBase {
 
   @Override
   void writePage(int rowCount, int valueCount, Statistics<?> statistics, ValuesWriter repetitionLevels,
-      ValuesWriter definitionLevels, ValuesWriter values) throws IOException {
+                 ValuesWriter definitionLevels, ValuesWriter values, SizeStatistics sizeStatistics) throws IOException {
     pageWriter.writePage(
         concat(repetitionLevels.getBytes(), definitionLevels.getBytes(), values.getBytes()),
         valueCount,
@@ -63,6 +64,7 @@ final class ColumnWriterV1 extends ColumnWriterBase {
         statistics,
         repetitionLevels.getEncoding(),
         definitionLevels.getEncoding(),
-        values.getEncoding());
+        values.getEncoding(),
+        sizeStatistics);
   }
 }

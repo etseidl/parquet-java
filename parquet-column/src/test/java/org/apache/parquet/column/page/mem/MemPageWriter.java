@@ -25,6 +25,7 @@ import org.apache.parquet.column.page.DataPageV1;
 import org.apache.parquet.column.page.DataPageV2;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.page.PageWriter;
+import org.apache.parquet.column.statistics.SizeStatistics;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.io.ParquetEncodingException;
 import org.slf4j.Logger;
@@ -45,7 +46,9 @@ public class MemPageWriter implements PageWriter {
   private long totalValueCount = 0;
 
   @Override
-  public void writePage(BytesInput bytesInput, int valueCount, Statistics statistics, Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding)
+  public void writePage(BytesInput bytesInput, int valueCount, Statistics statistics,
+                        Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding,
+                        SizeStatistics sizeStatistics)
       throws IOException {
     if (valueCount == 0) {
       throw new ParquetEncodingException("illegal page of 0 values");
@@ -58,14 +61,14 @@ public class MemPageWriter implements PageWriter {
 
   @Override
   public void writePage(BytesInput bytesInput, int valueCount, int rowCount, Statistics<?> statistics,
-      Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding) throws IOException {
-    writePage(bytesInput, valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding);
+                        Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding, SizeStatistics sizeStatistics) throws IOException {
+    writePage(bytesInput, valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding, sizeStatistics);
   }
 
   @Override
   public void writePageV2(int rowCount, int nullCount, int valueCount,
       BytesInput repetitionLevels, BytesInput definitionLevels,
-      Encoding dataEncoding, BytesInput data, Statistics<?> statistics) throws IOException {
+      Encoding dataEncoding, BytesInput data, Statistics<?> statistics, SizeStatistics sizeStatistics) throws IOException {
     if (valueCount == 0) {
       throw new ParquetEncodingException("illegal page of 0 values");
     }

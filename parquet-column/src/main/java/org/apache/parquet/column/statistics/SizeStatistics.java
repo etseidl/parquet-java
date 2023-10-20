@@ -162,9 +162,9 @@ public class SizeStatistics {
    */
   public void mergeStatistics(SizeStatistics other) {
     Preconditions.checkArgument(type.equals(other.type), "Cannot merge SizeStatistics of different types");
-    Preconditions.checkArgument(repetitionLevelHistogram.size() != other.repetitionLevelHistogram.size(),
+    Preconditions.checkArgument(repetitionLevelHistogram.size() == other.repetitionLevelHistogram.size(),
       "Cannot merge repetitionLevelHistogram with different sizes");
-    Preconditions.checkArgument(definitionLevelHistogram.size() != other.definitionLevelHistogram.size(),
+    Preconditions.checkArgument(definitionLevelHistogram.size() == other.definitionLevelHistogram.size(),
       "Cannot merge definitionLevelHistogram with different sizes");
     unencodedByteArrayDataBytes = Math.addExact(unencodedByteArrayDataBytes, other.unencodedByteArrayDataBytes);
     for (int i = 0; i < repetitionLevelHistogram.size(); i++) {

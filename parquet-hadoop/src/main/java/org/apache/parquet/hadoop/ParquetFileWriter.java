@@ -1041,6 +1041,7 @@ public class ParquetFileWriter {
       long uncompressedTotalPageSize,
       long compressedTotalPageSize,
       Statistics<?> totalStats,
+      SizeStatistics totalSizeStatistics,
       ColumnIndexBuilder columnIndexBuilder,
       OffsetIndexBuilder offsetIndexBuilder,
       BloomFilter bloomFilter,
@@ -1048,7 +1049,7 @@ public class ParquetFileWriter {
       Set<Encoding> dlEncodings,
       List<Encoding> dataEncodings) throws IOException {
     writeColumnChunk(descriptor, valueCount, compressionCodecName, dictionaryPage, bytes,
-      uncompressedTotalPageSize, compressedTotalPageSize, totalStats, columnIndexBuilder, offsetIndexBuilder,
+      uncompressedTotalPageSize, compressedTotalPageSize, totalStats, totalSizeStatistics,columnIndexBuilder, offsetIndexBuilder,
       bloomFilter, rlEncodings, dlEncodings, dataEncodings, null, 0, 0, null);
   }
 
@@ -1060,6 +1061,7 @@ public class ParquetFileWriter {
       long uncompressedTotalPageSize,
       long compressedTotalPageSize,
       Statistics<?> totalStats,
+      SizeStatistics totalSizeStatistics,
       ColumnIndexBuilder columnIndexBuilder,
       OffsetIndexBuilder offsetIndexBuilder,
       BloomFilter bloomFilter,
@@ -1113,6 +1115,7 @@ public class ParquetFileWriter {
     currentEncodings.addAll(dlEncodings);
     currentEncodings.addAll(dataEncodings);
     currentStatistics = totalStats;
+    currentSizeStatistics = totalSizeStatistics;
 
     this.columnIndexBuilder = columnIndexBuilder;
     this.offsetIndexBuilder = offsetIndexBuilder;
@@ -1144,7 +1147,8 @@ public class ParquetFileWriter {
         currentChunkDictionaryPageOffset,
         currentChunkValueCount,
         compressedLength,
-        uncompressedLength));
+        uncompressedLength,
+        currentSizeStatistics));
     this.currentBlock.setTotalByteSize(currentBlock.getTotalByteSize() + uncompressedLength);
     this.uncompressedLength = 0;
     this.compressedLength = 0;
@@ -1355,7 +1359,8 @@ public class ParquetFileWriter {
       offsets.dictionaryPageOffset,
       chunk.getValueCount(),
       chunk.getTotalSize(),
-      chunk.getTotalUncompressedSize()));
+      chunk.getTotalUncompressedSize(),
+      chunk.getSizeStatistics()));
 
     currentBlock.setTotalByteSize(currentBlock.getTotalByteSize() + chunk.getTotalUncompressedSize());
   }

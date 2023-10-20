@@ -31,6 +31,7 @@ import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.impl.ColumnReadStoreImpl;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.page.PageReadStore;
+import org.apache.parquet.column.statistics.SizeStatistics;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.column.values.bloomfilter.BloomFilter;
 import org.apache.parquet.compression.CompressionCodecFactory;
@@ -77,6 +78,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -375,6 +377,7 @@ public class ParquetRewriter implements Closeable {
     DictionaryPage dictionaryPage = null;
     long readValues = 0;
     Statistics<?> statistics = null;
+    SizeStatistics sizeStatistics = null;
     ParquetMetadataConverter converter = new ParquetMetadataConverter();
     int pageOrdinal = 0;
     long totalChunkValues = chunk.getValueCount();
@@ -422,6 +425,7 @@ public class ParquetRewriter implements Closeable {
                   dataPageAAD);
           statistics = convertStatistics(
                   originalCreatedBy, chunk.getPrimitiveType(), headerV1.getStatistics(), columnIndex, pageOrdinal, converter);
+          sizeStatistics = convertStatistics(chunk.getPrimitiveType(), offsetIndex, columnIndex, pageOrdinal);
           readValues += headerV1.getNum_values();
           if (offsetIndex != null) {
             long rowCount = 1 + offsetIndex.getLastRowIndex(
@@ -435,7 +439,8 @@ public class ParquetRewriter implements Closeable {
                     converter.getEncoding(headerV1.getDefinition_level_encoding()),
                     converter.getEncoding(headerV1.getEncoding()),
                     metaEncryptor,
-                    dataPageHeaderAAD);
+                    dataPageHeaderAAD,
+                    sizeStatistics);
           } else {
             writer.writeDataPage(toIntWithCheck(headerV1.getNum_values()),
                     pageHeader.getUncompressed_page_size(),
@@ -445,7 +450,8 @@ public class ParquetRewriter implements Closeable {
                     converter.getEncoding(headerV1.getDefinition_level_encoding()),
                     converter.getEncoding(headerV1.getEncoding()),
                     metaEncryptor,
-                    dataPageHeaderAAD);
+                    dataPageHeaderAAD,
+                    sizeStatistics);
           }
           pageOrdinal++;
           break;
@@ -473,6 +479,7 @@ public class ParquetRewriter implements Closeable {
                   dataPageAAD);
           statistics = convertStatistics(
                   originalCreatedBy, chunk.getPrimitiveType(), headerV2.getStatistics(), columnIndex, pageOrdinal, converter);
+          sizeStatistics = convertStatistics(chunk.getPrimitiveType(), offsetIndex, columnIndex, pageOrdinal);
           readValues += headerV2.getNum_values();
           writer.writeDataPageV2(headerV2.getNum_rows(),
                   headerV2.getNum_nulls(),
@@ -484,7 +491,8 @@ public class ParquetRewriter implements Closeable {
                   rawDataLength,
                   statistics,
                   metaEncryptor,
-                  dataPageHeaderAAD);
+                  dataPageHeaderAAD,
+                  sizeStatistics);
           pageOrdinal++;
           break;
         default:
@@ -523,6 +531,35 @@ public class ParquetRewriter implements Closeable {
     } else {
       return null;
     }
+  }
+
+  private SizeStatistics convertStatistics(PrimitiveType type, OffsetIndex offsetIndex, ColumnIndex columnIndex, int pageIndex)
+  {
+    if (offsetIndex == null || columnIndex == null) { return null; }
+    Optional<Long> unencodedBytes = offsetIndex.getUnencodedByteArrayDataBytes(pageIndex);
+
+    int numPages = columnIndex.getNullPages().size();
+    if (numPages == 0) { return null; }
+
+    List<Long> defHist = columnIndex.getDefinitionLevelHistogram();
+    if (defHist != null && defHist.size() > 0) {
+      int nlevel = defHist.size() / numPages;
+      int startIdx = pageIndex * nlevel;
+      int endIdx = startIdx + nlevel;
+      defHist = defHist.subList(startIdx, endIdx);
+    }
+
+    List<Long> repHist = columnIndex.getRepetitionLevelHistogram();
+    if (repHist != null && repHist.size() > 0) {
+      int nlevel = repHist.size() / numPages;
+      int startIdx = pageIndex * nlevel;
+      int endIdx = startIdx + nlevel;
+      repHist = repHist.subList(startIdx, endIdx);
+    }
+
+    SizeStatistics stats =
+      new SizeStatistics(type, unencodedBytes.orElse(0L), repHist, defHist);
+    return stats;
   }
 
   private byte[] processPageLoad(TransParquetFileReader reader,

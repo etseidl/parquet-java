@@ -405,8 +405,9 @@ abstract class ColumnWriterBase implements ColumnWriter {
     this.rowsWrittenSoFar += pageRowCount;
     if (DEBUG)
       LOG.debug("write page");
+    SizeStatistics sizeStatistics = sizeStatisticsBuilder.build();
     try {
-      writePage(pageRowCount, valueCount, statistics, repetitionLevelColumn, definitionLevelColumn, dataColumn);
+      writePage(pageRowCount, valueCount, statistics, repetitionLevelColumn, definitionLevelColumn, dataColumn, sizeStatistics);
     } catch (IOException e) {
       throw new ParquetEncodingException("could not write page for " + path, e);
     }
@@ -419,5 +420,5 @@ abstract class ColumnWriterBase implements ColumnWriter {
   }
 
   abstract void writePage(int rowCount, int valueCount, Statistics<?> statistics, ValuesWriter repetitionLevels,
-      ValuesWriter definitionLevels, ValuesWriter values) throws IOException;
+      ValuesWriter definitionLevels, ValuesWriter values, SizeStatistics sizeStatistics) throws IOException;
 }

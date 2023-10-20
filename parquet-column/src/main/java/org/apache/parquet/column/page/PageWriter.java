@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.Encoding;
+import org.apache.parquet.column.statistics.SizeStatistics;
 import org.apache.parquet.column.statistics.Statistics;
 
 /**
@@ -42,7 +43,9 @@ public interface PageWriter {
    *             {@link #writePage(BytesInput, int, int, Statistics, Encoding, Encoding, Encoding)} instead
    */
   @Deprecated
-  void writePage(BytesInput bytesInput, int valueCount, Statistics<?> statistics, Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding) throws IOException;
+  void writePage(BytesInput bytesInput, int valueCount, Statistics<?> statistics,
+                 Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding,
+                 SizeStatistics sizeStatistics) throws IOException;
 
   /**
    * writes a single page
@@ -55,7 +58,9 @@ public interface PageWriter {
    * @param valuesEncoding values encoding
    * @throws IOException
    */
-  void writePage(BytesInput bytesInput, int valueCount, int rowCount, Statistics<?> statistics, Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding) throws IOException;
+  void writePage(BytesInput bytesInput, int valueCount, int rowCount, Statistics<?> statistics,
+                 Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding,
+                 SizeStatistics sizeStatistics) throws IOException;
 
   /**
    * writes a single page in the new format
@@ -67,6 +72,7 @@ public interface PageWriter {
    * @param dataEncoding the encoding for the data
    * @param data the data encoded with dataEncoding
    * @param statistics optional stats for this page
+   * @param sizeStatistics optional size statistics for this page
    * @throws IOException if there is an exception while writing page data
    */
   void writePageV2(
@@ -74,7 +80,8 @@ public interface PageWriter {
       BytesInput repetitionLevels, BytesInput definitionLevels,
       Encoding dataEncoding,
       BytesInput data,
-      Statistics<?> statistics) throws IOException;
+      Statistics<?> statistics,
+      SizeStatistics sizeStatistics) throws IOException;
 
   /**
    * @return the current size used in the memory buffer for that column chunk

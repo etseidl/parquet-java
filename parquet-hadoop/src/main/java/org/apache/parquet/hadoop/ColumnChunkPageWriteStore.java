@@ -25,9 +25,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.zip.CRC32;
 
+import jdk.internal.org.jline.terminal.Size;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.ConcatenatingByteArrayCollector;
 import org.apache.parquet.column.ColumnDescriptor;
@@ -36,6 +39,7 @@ import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.page.PageWriteStore;
 import org.apache.parquet.column.page.PageWriter;
+import org.apache.parquet.column.statistics.SizeStatistics;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.column.values.bloomfilter.BloomFilter;
 import org.apache.parquet.column.values.bloomfilter.BloomFilterWriteStore;
@@ -56,6 +60,8 @@ import org.apache.parquet.bytes.ByteBufferAllocator;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.util.Optional.empty;
 
 @InterfaceAudience.Private
 public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWriteStore {
@@ -86,6 +92,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     private ColumnIndexBuilder columnIndexBuilder;
     private OffsetIndexBuilder offsetIndexBuilder;
     private Statistics totalStatistics;
+    private SizeStatistics totalSizeStatistics;
     private final ByteBufferAllocator allocator;
 
     private final CRC32 crc;
@@ -142,12 +149,12 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     @Override
     @Deprecated
     public void writePage(BytesInput bytesInput, int valueCount, Statistics<?> statistics, Encoding rlEncoding,
-        Encoding dlEncoding, Encoding valuesEncoding) throws IOException {
+                          Encoding dlEncoding, Encoding valuesEncoding, SizeStatistics sizeStatistics) throws IOException {
       // Setting the builders to the no-op ones so no column/offset indexes will be written for this column chunk
       columnIndexBuilder = ColumnIndexBuilder.getNoOpBuilder();
       offsetIndexBuilder = OffsetIndexBuilder.getNoOpBuilder();
 
-      writePage(bytesInput, valueCount, -1, statistics, rlEncoding, dlEncoding, valuesEncoding);
+      writePage(bytesInput, valueCount, -1, statistics, rlEncoding, dlEncoding, valuesEncoding, sizeStatistics);
     }
 
     @Override
@@ -157,7 +164,8 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
                           Statistics statistics,
                           Encoding rlEncoding,
                           Encoding dlEncoding,
-                          Encoding valuesEncoding) throws IOException {
+                          Encoding valuesEncoding,
+                          SizeStatistics sizeStatistics) throws IOException {
       pageOrdinal++;
       long uncompressedSize = bytes.size();
       if (uncompressedSize > Integer.MAX_VALUE || uncompressedSize < 0) {
@@ -218,8 +226,18 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
         totalStatistics.mergeStatistics(statistics);
       }
 
-      columnIndexBuilder.add(statistics);
-      offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount);
+      if (sizeStatistics != null) {
+        if (totalSizeStatistics == null) {
+          totalSizeStatistics = sizeStatistics.copy();
+        } else {
+          totalSizeStatistics.mergeStatistics(sizeStatistics);
+        }
+      }
+
+      columnIndexBuilder.add(statistics, sizeStatistics);
+      Optional<Long> unencodedBytes =
+        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty();
+      offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount, unencodedBytes);
 
       // by concatenating before collecting instead of collecting twice,
       // we only allocate one buffer to copy into instead of multiple.
@@ -234,7 +252,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
         int rowCount, int nullCount, int valueCount,
         BytesInput repetitionLevels, BytesInput definitionLevels,
         Encoding dataEncoding, BytesInput data,
-        Statistics<?> statistics) throws IOException {
+        Statistics<?> statistics, SizeStatistics sizeStatistics) throws IOException {
       pageOrdinal++;
       
       int rlByteLength = toIntWithCheck(repetitionLevels.size());
@@ -305,8 +323,19 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
         totalStatistics.mergeStatistics(statistics);
       }
 
-      columnIndexBuilder.add(statistics);
-      offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount);
+      if (sizeStatistics != null) {
+        if (totalSizeStatistics == null) {
+          totalSizeStatistics = sizeStatistics.copy();
+        } else {
+          totalSizeStatistics.mergeStatistics(sizeStatistics);
+        }
+      }
+
+      Optional<Long> unencodedBytes =
+        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty();
+
+      columnIndexBuilder.add(statistics, sizeStatistics);
+      offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount, unencodedBytes);
 
       // by concatenating before collecting instead of collecting twice,
       // we only allocate one buffer to copy into instead of multiple.
@@ -345,6 +374,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
             uncompressedLength,
             compressedLength,
             totalStatistics,
+            totalSizeStatistics,
             columnIndexBuilder,
             offsetIndexBuilder,
             bloomFilter,
@@ -361,6 +391,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
             uncompressedLength,
             compressedLength,
             totalStatistics,
+            totalSizeStatistics,
             columnIndexBuilder,
             offsetIndexBuilder,
             bloomFilter,
