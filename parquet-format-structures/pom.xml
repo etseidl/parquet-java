@@ -64,6 +64,16 @@
                <outputDirectory>${parquet.thrift.path}</outputDirectory>
              </configuration>
            </execution>
+           <execution>
+             <goals>
+               <goal>analyze-only</goal>
+             </goals>
+             <configuration>
+               <ignoredUnusedDeclaredDependencies>
+                 <ignoredUnusedDeclaredDependency>javax.annotation:javax.annotation-api</ignoredUnusedDeclaredDependency>
+               </ignoredUnusedDeclaredDependencies>
+             </configuration>
+           </execution>
          </executions>
        </plugin>
       <!-- thrift -->
@@ -100,6 +110,9 @@
                 <includes>
                   <include>org.apache.thrift:libthrift</include>
                 </includes>
+                <excludes>
+                  <include>javax.annotation:javax.annotation-api</include>
+                </excludes>
               </artifactSet>
               <filters>
                 <filter>
@@ -155,6 +168,11 @@
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
       <version>${format.thrift.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <version>${format.annotation.version}</version>
     </dependency>
   </dependencies>
 
