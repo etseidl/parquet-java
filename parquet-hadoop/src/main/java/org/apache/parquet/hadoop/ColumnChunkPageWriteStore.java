@@ -61,8 +61,6 @@ import org.apache.yetus.audience.InterfaceAudience;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static java.util.Optional.empty;
-
 @InterfaceAudience.Private
 public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWriteStore {
   private static final Logger LOG = LoggerFactory.getLogger(ColumnChunkPageWriteStore.class);
@@ -149,12 +147,12 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     @Override
     @Deprecated
     public void writePage(BytesInput bytesInput, int valueCount, Statistics<?> statistics, Encoding rlEncoding,
-                          Encoding dlEncoding, Encoding valuesEncoding, SizeStatistics sizeStatistics) throws IOException {
+        Encoding dlEncoding, Encoding valuesEncoding) throws IOException {
       // Setting the builders to the no-op ones so no column/offset indexes will be written for this column chunk
       columnIndexBuilder = ColumnIndexBuilder.getNoOpBuilder();
       offsetIndexBuilder = OffsetIndexBuilder.getNoOpBuilder();
 
-      writePage(bytesInput, valueCount, -1, statistics, rlEncoding, dlEncoding, valuesEncoding, sizeStatistics);
+      writePage(bytesInput, valueCount, -1, statistics, rlEncoding, dlEncoding, valuesEncoding);
     }
 
     @Override

@@ -72,7 +72,6 @@ final class ColumnWriterV1 extends ColumnWriterBase {
         sizeStatistics,
         repetitionLevels.getEncoding(),
         definitionLevels.getEncoding(),
-        values.getEncoding(),
-        sizeStatistics);
+        values.getEncoding());
   }
 }

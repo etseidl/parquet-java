@@ -217,8 +217,7 @@ public class TestCorruptDeltaByteArrays {
         new BinaryStatistics(),
         rdValues.getEncoding(),
         rdValues.getEncoding(),
-        writer.getEncoding(),
-        null);
+        writer.getEncoding());
     pages.addRowCount(10);
 
     writer.reset(); // sets previous to new byte[0]
@@ -234,8 +233,7 @@ public class TestCorruptDeltaByteArrays {
         new BinaryStatistics(),
         rdValues.getEncoding(),
         rdValues.getEncoding(),
-        writer.getEncoding(),
-        null);
+        writer.getEncoding());
     pages.addRowCount(10);
 
     final List<String> actualValues = new ArrayList<>();

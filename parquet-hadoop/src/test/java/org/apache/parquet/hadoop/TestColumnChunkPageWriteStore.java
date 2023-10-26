@@ -186,7 +186,7 @@ public class TestColumnChunkPageWriteStore {
             rowCount, nullCount, valueCount,
             repetitionLevels, definitionLevels,
             dataEncoding, data,
-            statistics, null);
+            statistics);
         store.flushToFileWriter(writer);
         pageSize = outputFile.out().getPos() - pageOffset;
       }
@@ -258,7 +258,7 @@ public class TestColumnChunkPageWriteStore {
 
     for (ColumnDescriptor col : schema.getColumns()) {
       PageWriter pageWriter = store.getPageWriter(col);
-      pageWriter.writePage(fakeData, fakeCount, fakeStats, RLE, RLE, PLAIN, null);
+      pageWriter.writePage(fakeData, fakeCount, fakeStats, RLE, RLE, PLAIN);
     }
 
     // flush to the mock writer

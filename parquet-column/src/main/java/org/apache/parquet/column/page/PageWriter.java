@@ -43,9 +43,7 @@ public interface PageWriter {
    *             {@link #writePage(BytesInput, int, int, Statistics, Encoding, Encoding, Encoding)} instead
    */
   @Deprecated
-  void writePage(BytesInput bytesInput, int valueCount, Statistics<?> statistics,
-                 Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding,
-                 SizeStatistics sizeStatistics) throws IOException;
+  void writePage(BytesInput bytesInput, int valueCount, Statistics<?> statistics, Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding) throws IOException;
 
   /**
    * writes a single page
@@ -88,7 +86,6 @@ public interface PageWriter {
    * @param dataEncoding the encoding for the data
    * @param data the data encoded with dataEncoding
    * @param statistics optional stats for this page
-   * @param sizeStatistics optional size statistics for this page
    * @throws IOException if there is an exception while writing page data
    */
   @Deprecated
@@ -97,8 +94,7 @@ public interface PageWriter {
       BytesInput repetitionLevels, BytesInput definitionLevels,
       Encoding dataEncoding,
       BytesInput data,
-      Statistics<?> statistics,
-      SizeStatistics sizeStatistics) throws IOException;
+      Statistics<?> statistics) throws IOException;
 
   /**
    * writes a single page in the new format

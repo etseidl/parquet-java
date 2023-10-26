@@ -405,7 +405,6 @@ abstract class ColumnWriterBase implements ColumnWriter {
     this.rowsWrittenSoFar += pageRowCount;
     if (DEBUG)
       LOG.debug("write page");
-    SizeStatistics sizeStatistics = sizeStatisticsBuilder.build();
     try {
       writePage(pageRowCount, valueCount, statistics, sizeStatisticsBuilder.build(),
         repetitionLevelColumn, definitionLevelColumn, dataColumn);

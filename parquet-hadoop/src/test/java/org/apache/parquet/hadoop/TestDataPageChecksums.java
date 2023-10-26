@@ -134,15 +134,15 @@ public class TestDataPageChecksums {
     if (version == ParquetProperties.WriterVersion.PARQUET_1_0) {
       PageWriter pageWriter = writeStore.getPageWriter(colADesc);
       pageWriter.writePage(BytesInput.from(colAPage1Bytes), numRecordsLargeFile / 2,
-        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN, null);
+        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN);
       pageWriter.writePage(BytesInput.from(colAPage2Bytes), numRecordsLargeFile / 2,
-        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN, null);
+        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN);
 
       pageWriter = writeStore.getPageWriter(colBDesc);
       pageWriter.writePage(BytesInput.from(colBPage1Bytes), numRecordsLargeFile / 2,
-        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN, null);
+        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN);
       pageWriter.writePage(BytesInput.from(colBPage2Bytes), numRecordsLargeFile / 2,
-        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN, null);
+        numRecordsLargeFile / 2, EMPTY_STATS_INT32, Encoding.RLE, Encoding.RLE, Encoding.PLAIN);
     } else if (version == ParquetProperties.WriterVersion.PARQUET_2_0) {
       PageWriter pageWriter = writeStore.getPageWriter(colADesc);
       pageWriter.writePageV2(
@@ -150,13 +150,13 @@ public class TestDataPageChecksums {
         BytesInput.from(colAPage1Bytes, 0, PAGE_SIZE / 4),
         BytesInput.from(colAPage1Bytes, PAGE_SIZE / 4, PAGE_SIZE / 4),
         Encoding.PLAIN, BytesInput.from(colAPage1Bytes, PAGE_SIZE / 2, PAGE_SIZE / 2),
-        EMPTY_STATS_INT32, null);
+        EMPTY_STATS_INT32);
       pageWriter.writePageV2(
         numRecordsLargeFile / 2, 0, numRecordsLargeFile / 2,
         BytesInput.from(colAPage2Bytes, 0, PAGE_SIZE / 4),
         BytesInput.from(colAPage2Bytes, PAGE_SIZE / 4, PAGE_SIZE / 4),
         Encoding.PLAIN, BytesInput.from(colAPage2Bytes, PAGE_SIZE / 2, PAGE_SIZE / 2),
-        EMPTY_STATS_INT32, null);
+        EMPTY_STATS_INT32);
 
       pageWriter = writeStore.getPageWriter(colBDesc);
       pageWriter.writePageV2(
@@ -164,13 +164,13 @@ public class TestDataPageChecksums {
         BytesInput.from(colBPage1Bytes, 0, PAGE_SIZE / 4),
         BytesInput.from(colBPage1Bytes, PAGE_SIZE / 4, PAGE_SIZE / 4),
         Encoding.PLAIN, BytesInput.from(colBPage1Bytes, PAGE_SIZE / 2, PAGE_SIZE / 2),
-        EMPTY_STATS_INT32, null);
+        EMPTY_STATS_INT32);
       pageWriter.writePageV2(
         numRecordsLargeFile / 2, 0, numRecordsLargeFile / 2,
         BytesInput.from(colBPage2Bytes, 0, PAGE_SIZE / 4),
         BytesInput.from(colBPage2Bytes, PAGE_SIZE / 4, PAGE_SIZE / 4),
         Encoding.PLAIN, BytesInput.from(colBPage2Bytes, PAGE_SIZE / 2, PAGE_SIZE / 2),
-        EMPTY_STATS_INT32, null);
+        EMPTY_STATS_INT32);
     } else {
       throw new IllegalArgumentException("Unknown writer version: " + version);
     }

@@ -46,9 +46,7 @@ public class MemPageWriter implements PageWriter {
   private long totalValueCount = 0;
 
   @Override
-  public void writePage(BytesInput bytesInput, int valueCount, Statistics statistics,
-                        Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding,
-                        SizeStatistics sizeStatistics)
+  public void writePage(BytesInput bytesInput, int valueCount, Statistics statistics, Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding)
       throws IOException {
     if (valueCount == 0) {
       throw new ParquetEncodingException("illegal page of 0 values");
@@ -61,8 +59,8 @@ public class MemPageWriter implements PageWriter {
 
   @Override
   public void writePage(BytesInput bytesInput, int valueCount, int rowCount, Statistics<?> statistics,
-                        Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding, SizeStatistics sizeStatistics) throws IOException {
-    writePage(bytesInput, valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding, sizeStatistics);
+      Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding) throws IOException {
+    writePage(bytesInput, valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding);
   }
 
   @Override
@@ -75,7 +73,7 @@ public class MemPageWriter implements PageWriter {
   @Override
   public void writePageV2(int rowCount, int nullCount, int valueCount,
       BytesInput repetitionLevels, BytesInput definitionLevels,
-      Encoding dataEncoding, BytesInput data, Statistics<?> statistics, SizeStatistics sizeStatistics) throws IOException {
+      Encoding dataEncoding, BytesInput data, Statistics<?> statistics) throws IOException {
     if (valueCount == 0) {
       throw new ParquetEncodingException("illegal page of 0 values");
     }
