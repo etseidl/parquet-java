@@ -26,11 +26,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.zip.CRC32;
 
-import jdk.internal.org.jline.terminal.Size;
+import com.sun.tools.corba.se.idl.InvalidArgument;
+import org.apache.parquet.ParquetRuntimeException;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.ConcatenatingByteArrayCollector;
 import org.apache.parquet.column.ColumnDescriptor;
@@ -158,14 +158,26 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     }
 
     @Override
+    @Deprecated
     public void writePage(BytesInput bytes,
                           int valueCount,
                           int rowCount,
                           Statistics statistics,
                           Encoding rlEncoding,
                           Encoding dlEncoding,
-                          Encoding valuesEncoding,
-                          SizeStatistics sizeStatistics) throws IOException {
+                          Encoding valuesEncoding) throws IOException {
+      writePage(bytes, valueCount, rowCount, statistics, null, rlEncoding, dlEncoding, valuesEncoding);
+    }
+
+    @Override
+    public void writePage(BytesInput bytes,
+                          int valueCount,
+                          int rowCount,
+                          Statistics statistics,
+                          SizeStatistics sizeStatistics,
+                          Encoding rlEncoding,
+                          Encoding dlEncoding,
+                          Encoding valuesEncoding) throws IOException {
       pageOrdinal++;
       long uncompressedSize = bytes.size();
       if (uncompressedSize > Integer.MAX_VALUE || uncompressedSize < 0) {
@@ -226,6 +238,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
         totalStatistics.mergeStatistics(statistics);
       }
 
+      assert sizeStatistics != null || totalSizeStatistics == null;
       if (sizeStatistics != null) {
         if (totalSizeStatistics == null) {
           totalSizeStatistics = sizeStatistics.copy();
@@ -235,9 +248,8 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       }
 
       columnIndexBuilder.add(statistics, sizeStatistics);
-      Optional<Long> unencodedBytes =
-        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty();
-      offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount, unencodedBytes);
+      offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount,
+        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty());
 
       // by concatenating before collecting instead of collecting twice,
       // we only allocate one buffer to copy into instead of multiple.
@@ -245,6 +257,16 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       rlEncodings.add(rlEncoding);
       dlEncodings.add(dlEncoding);
       dataEncodings.add(valuesEncoding);
+    }
+
+    @Override
+    @Deprecated
+    public void writePageV2(
+      int rowCount, int nullCount, int valueCount,
+      BytesInput repetitionLevels, BytesInput definitionLevels,
+      Encoding dataEncoding, BytesInput data,
+      Statistics<?> statistics) throws IOException {
+      writePageV2(rowCount, nullCount, valueCount, repetitionLevels, definitionLevels, dataEncoding, data, statistics, null);
     }
 
     @Override
@@ -323,6 +345,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
         totalStatistics.mergeStatistics(statistics);
       }
 
+      assert sizeStatistics != null || totalSizeStatistics == null;
       if (sizeStatistics != null) {
         if (totalSizeStatistics == null) {
           totalSizeStatistics = sizeStatistics.copy();
@@ -331,11 +354,9 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
         }
       }
 
-      Optional<Long> unencodedBytes =
-        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty();
-
       columnIndexBuilder.add(statistics, sizeStatistics);
-      offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount, unencodedBytes);
+      offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount,
+        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty());
 
       // by concatenating before collecting instead of collecting twice,
       // we only allocate one buffer to copy into instead of multiple.

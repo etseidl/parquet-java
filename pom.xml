@@ -550,6 +550,12 @@
               <exclude>org.apache.parquet.hadoop.ParquetRecordWriter</exclude>
               <exclude>org.apache.parquet.proto.ProtoParquetReader#builder(org.apache.hadoop.fs.Path,boolean)</exclude>
               <exclude>org.apache.parquet.proto.ProtoParquetReader#builder(org.apache.parquet.io.InputFile,boolean)</exclude>
+              <!-- Some new methods are added to interface to support SizeStatistics-->
+              <exclude>org.apache.parquet.column.page.PageWriter</exclude>
+              <exclude>org.apache.parquet.internal.column.columnindex.ColumnIndex#getDefinitionLevelHistogram()</exclude>
+              <exclude>org.apache.parquet.internal.column.columnindex.ColumnIndex#getRepetitionLevelHistogram()</exclude>
+              <exclude>org.apache.parquet.internal.column.columnindex.OffsetIndex#getUnencodedByteArrayDataBytes(int)</exclude>
+              <exclude>org.apache.parquet.hadoop.metadata.ColumnChunkMetaData#getSizeStatistics():</exclude>
             </excludes>
           </parameter>
         </configuration>

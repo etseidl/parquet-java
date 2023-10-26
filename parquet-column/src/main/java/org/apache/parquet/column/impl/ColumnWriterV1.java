@@ -55,13 +55,21 @@ final class ColumnWriterV1 extends ColumnWriterBase {
   }
 
   @Override
+  @Deprecated
   void writePage(int rowCount, int valueCount, Statistics<?> statistics, ValuesWriter repetitionLevels,
-                 ValuesWriter definitionLevels, ValuesWriter values, SizeStatistics sizeStatistics) throws IOException {
+                 ValuesWriter definitionLevels, ValuesWriter values) throws IOException {
+    writePage(rowCount, valueCount, statistics, null, repetitionLevels, definitionLevels, values);
+  }
+
+  @Override
+  void writePage(int rowCount, int valueCount, Statistics<?> statistics, SizeStatistics sizeStatistics,
+                 ValuesWriter repetitionLevels, ValuesWriter definitionLevels, ValuesWriter values) throws IOException {
     pageWriter.writePage(
         concat(repetitionLevels.getBytes(), definitionLevels.getBytes(), values.getBytes()),
         valueCount,
         rowCount,
         statistics,
+        sizeStatistics,
         repetitionLevels.getEncoding(),
         definitionLevels.getEncoding(),
         values.getEncoding(),

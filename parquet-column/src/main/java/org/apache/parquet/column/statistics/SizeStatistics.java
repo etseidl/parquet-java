@@ -107,8 +107,10 @@ public class SizeStatistics {
      * @param definitionLevel definition level of the value
      */
     public void add(int repetitionLevel, int definitionLevel) {
-      assert repetitionLevel < repetitionLevelHistogram.length;
-      assert definitionLevel < definitionLevelHistogram.length;
+      Preconditions.checkArgument(0 <= repetitionLevel && repetitionLevel < repetitionLevelHistogram.length,
+        "repetitionLevel %s is out of range [0, %s]", repetitionLevel, repetitionLevelHistogram.length - 1);
+      Preconditions.checkArgument(definitionLevel < definitionLevelHistogram.length,
+        "definitionLevel %s is out of range [0, %s]", definitionLevel, definitionLevelHistogram.length - 1);
       repetitionLevelHistogram[repetitionLevel]++;
       definitionLevelHistogram[definitionLevel]++;
     }
