@@ -107,8 +107,10 @@ public class SizeStatistics {
      * @param definitionLevel definition level of the value
      */
     public void add(int repetitionLevel, int definitionLevel) {
-      assert repetitionLevel < repetitionLevelHistogram.length;
-      assert definitionLevel < definitionLevelHistogram.length;
+      Preconditions.checkArgument(0 <= repetitionLevel && repetitionLevel < repetitionLevelHistogram.length,
+        "repetitionLevel %s is out of range [0, %s]", repetitionLevel, repetitionLevelHistogram.length - 1);
+      Preconditions.checkArgument(definitionLevel < definitionLevelHistogram.length,
+        "definitionLevel %s is out of range [0, %s]", definitionLevel, definitionLevelHistogram.length - 1);
       repetitionLevelHistogram[repetitionLevel]++;
       definitionLevelHistogram[definitionLevel]++;
     }
@@ -162,9 +164,9 @@ public class SizeStatistics {
    */
   public void mergeStatistics(SizeStatistics other) {
     Preconditions.checkArgument(type.equals(other.type), "Cannot merge SizeStatistics of different types");
-    Preconditions.checkArgument(repetitionLevelHistogram.size() != other.repetitionLevelHistogram.size(),
+    Preconditions.checkArgument(repetitionLevelHistogram.size() == other.repetitionLevelHistogram.size(),
       "Cannot merge repetitionLevelHistogram with different sizes");
-    Preconditions.checkArgument(definitionLevelHistogram.size() != other.definitionLevelHistogram.size(),
+    Preconditions.checkArgument(definitionLevelHistogram.size() == other.definitionLevelHistogram.size(),
       "Cannot merge definitionLevelHistogram with different sizes");
     unencodedByteArrayDataBytes = Math.addExact(unencodedByteArrayDataBytes, other.unencodedByteArrayDataBytes);
     for (int i = 0; i < repetitionLevelHistogram.size(); i++) {

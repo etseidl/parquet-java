@@ -800,10 +800,13 @@ public class ParquetFileWriter {
       currentStatistics.mergeStatistics(statistics);
     }
 
-    if (currentSizeStatistics == null) {
-      currentSizeStatistics = sizeStatistics.copy();
-    } else {
-      currentSizeStatistics.mergeStatistics(sizeStatistics);
+    assert sizeStatistics != null || currentSizeStatistics == null;
+    if (sizeStatistics != null) {
+      if (currentSizeStatistics == null) {
+        currentSizeStatistics = sizeStatistics.copy();
+      } else {
+        currentSizeStatistics.mergeStatistics(sizeStatistics);
+      }
     }
 
     columnIndexBuilder.add(statistics, sizeStatistics);
@@ -998,10 +1001,13 @@ public class ParquetFileWriter {
       currentStatistics.mergeStatistics(statistics);
     }
 
-    if (currentSizeStatistics == null) {
-      currentSizeStatistics = sizeStatistics.copy();
-    } else {
-      currentSizeStatistics.mergeStatistics(sizeStatistics);
+    assert sizeStatistics != null || currentSizeStatistics == null;
+    if (sizeStatistics != null) {
+      if (currentSizeStatistics == null) {
+        currentSizeStatistics = sizeStatistics.copy();
+      } else {
+        currentSizeStatistics.mergeStatistics(sizeStatistics);
+      }
     }
 
     columnIndexBuilder.add(statistics, sizeStatistics);
@@ -1041,6 +1047,7 @@ public class ParquetFileWriter {
       long uncompressedTotalPageSize,
       long compressedTotalPageSize,
       Statistics<?> totalStats,
+      SizeStatistics totalSizeStats,
       ColumnIndexBuilder columnIndexBuilder,
       OffsetIndexBuilder offsetIndexBuilder,
       BloomFilter bloomFilter,
@@ -1048,8 +1055,8 @@ public class ParquetFileWriter {
       Set<Encoding> dlEncodings,
       List<Encoding> dataEncodings) throws IOException {
     writeColumnChunk(descriptor, valueCount, compressionCodecName, dictionaryPage, bytes,
-      uncompressedTotalPageSize, compressedTotalPageSize, totalStats, columnIndexBuilder, offsetIndexBuilder,
-      bloomFilter, rlEncodings, dlEncodings, dataEncodings, null, 0, 0, null);
+      uncompressedTotalPageSize, compressedTotalPageSize, totalStats, totalSizeStats,
+      columnIndexBuilder, offsetIndexBuilder, bloomFilter, rlEncodings, dlEncodings, dataEncodings, null, 0, 0, null);
   }
 
   void writeColumnChunk(ColumnDescriptor descriptor,
@@ -1060,6 +1067,7 @@ public class ParquetFileWriter {
       long uncompressedTotalPageSize,
       long compressedTotalPageSize,
       Statistics<?> totalStats,
+      SizeStatistics totalSizeStats,
       ColumnIndexBuilder columnIndexBuilder,
       OffsetIndexBuilder offsetIndexBuilder,
       BloomFilter bloomFilter,
@@ -1113,6 +1121,7 @@ public class ParquetFileWriter {
     currentEncodings.addAll(dlEncodings);
     currentEncodings.addAll(dataEncodings);
     currentStatistics = totalStats;
+    currentSizeStatistics = totalSizeStats;
 
     this.columnIndexBuilder = columnIndexBuilder;
     this.offsetIndexBuilder = offsetIndexBuilder;
@@ -1144,7 +1153,8 @@ public class ParquetFileWriter {
         currentChunkDictionaryPageOffset,
         currentChunkValueCount,
         compressedLength,
-        uncompressedLength));
+        uncompressedLength,
+        currentSizeStatistics));
     this.currentBlock.setTotalByteSize(currentBlock.getTotalByteSize() + uncompressedLength);
     this.uncompressedLength = 0;
     this.compressedLength = 0;
