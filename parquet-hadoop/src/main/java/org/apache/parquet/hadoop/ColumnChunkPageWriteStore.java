@@ -29,7 +29,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.zip.CRC32;
 
-import com.sun.tools.corba.se.idl.InvalidArgument;
 import org.apache.parquet.ParquetRuntimeException;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.ConcatenatingByteArrayCollector;
