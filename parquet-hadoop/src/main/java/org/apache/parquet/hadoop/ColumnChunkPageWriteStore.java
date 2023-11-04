@@ -25,9 +25,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.zip.CRC32;
 
+import com.sun.tools.corba.se.idl.InvalidArgument;
+import org.apache.parquet.ParquetRuntimeException;
+import org.apache.parquet.Preconditions;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.ConcatenatingByteArrayCollector;
 import org.apache.parquet.column.ColumnDescriptor;
@@ -36,6 +40,7 @@ import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.page.PageWriteStore;
 import org.apache.parquet.column.page.PageWriter;
+import org.apache.parquet.column.statistics.SizeStatistics;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.column.values.bloomfilter.BloomFilter;
 import org.apache.parquet.column.values.bloomfilter.BloomFilterWriteStore;
@@ -86,6 +91,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     private ColumnIndexBuilder columnIndexBuilder;
     private OffsetIndexBuilder offsetIndexBuilder;
     private Statistics totalStatistics;
+    private SizeStatistics totalSizeStatistics;
     private final ByteBufferAllocator allocator;
 
     private final CRC32 crc;
@@ -116,9 +122,10 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       this.buf = new ConcatenatingByteArrayCollector();
       this.columnIndexBuilder = ColumnIndexBuilder.getBuilder(path.getPrimitiveType(), columnIndexTruncateLength);
       this.offsetIndexBuilder = OffsetIndexBuilder.getBuilder();
+      this.totalSizeStatistics = SizeStatistics.newBuilder(path.getPrimitiveType(),
+        path.getMaxRepetitionLevel(), path.getMaxDefinitionLevel()).build();
       this.pageWriteChecksumEnabled = pageWriteChecksumEnabled;
       this.crc = pageWriteChecksumEnabled ? new CRC32() : null;
-      
       this.headerBlockEncryptor = headerBlockEncryptor;
       this.pageBlockEncryptor = pageBlockEncryptor;
       this.fileAAD = fileAAD;
@@ -151,10 +158,23 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     }
 
     @Override
+    @Deprecated
     public void writePage(BytesInput bytes,
                           int valueCount,
                           int rowCount,
                           Statistics statistics,
+                          Encoding rlEncoding,
+                          Encoding dlEncoding,
+                          Encoding valuesEncoding) throws IOException {
+      writePage(bytes, valueCount, rowCount, statistics, null, rlEncoding, dlEncoding, valuesEncoding);
+    }
+
+    @Override
+    public void writePage(BytesInput bytes,
+                          int valueCount,
+                          int rowCount,
+                          Statistics statistics,
+                          SizeStatistics sizeStatistics,
                           Encoding rlEncoding,
                           Encoding dlEncoding,
                           Encoding valuesEncoding) throws IOException {
@@ -211,8 +231,9 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       this.totalValueCount += valueCount;
       this.pageCount += 1;
 
-      mergeColumnStatistics(statistics);
-      offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount);
+      mergeColumnStatistics(statistics, sizeStatistics);
+      offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount,
+        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty());
 
       // by concatenating before collecting instead of collecting twice,
       // we only allocate one buffer to copy into instead of multiple.
@@ -223,11 +244,21 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
     }
 
     @Override
+    @Deprecated
+    public void writePageV2(
+      int rowCount, int nullCount, int valueCount,
+      BytesInput repetitionLevels, BytesInput definitionLevels,
+      Encoding dataEncoding, BytesInput data,
+      Statistics<?> statistics) throws IOException {
+      writePageV2(rowCount, nullCount, valueCount, repetitionLevels, definitionLevels, dataEncoding, data, statistics, null);
+    }
+
+    @Override
     public void writePageV2(
         int rowCount, int nullCount, int valueCount,
         BytesInput repetitionLevels, BytesInput definitionLevels,
         Encoding dataEncoding, BytesInput data,
-        Statistics<?> statistics) throws IOException {
+        Statistics<?> statistics, SizeStatistics sizeStatistics) throws IOException {
       pageOrdinal++;
       
       int rlByteLength = toIntWithCheck(repetitionLevels.size());
@@ -291,8 +322,9 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       this.totalValueCount += valueCount;
       this.pageCount += 1;
 
-      mergeColumnStatistics(statistics);
-      offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount);
+      mergeColumnStatistics(statistics, sizeStatistics);
+      offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount,
+        sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty());
 
       // by concatenating before collecting instead of collecting twice,
       // we only allocate one buffer to copy into instead of multiple.
@@ -315,7 +347,14 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       return (int)size;
     }
 
-    private void mergeColumnStatistics(Statistics<?> statistics) {
+    private void mergeColumnStatistics(Statistics<?> statistics, SizeStatistics sizeStatistics) {
+      Preconditions.checkState(totalSizeStatistics != null, "Aggregate size statistics should not be null");
+      totalSizeStatistics.mergeStatistics(sizeStatistics);
+      if (!totalSizeStatistics.isValid()) {
+        // Set page size statistics to null to clear state in the ColumnIndexBuilder.
+        sizeStatistics = null;
+      }
+
       if (totalStatistics != null && totalStatistics.isEmpty()) {
         return;
       }
@@ -328,10 +367,10 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       } else if (totalStatistics == null) {
         // Copying the statistics if it is not initialized yet, so we have the correct typed one
         totalStatistics = statistics.copy();
-        columnIndexBuilder.add(statistics);
+        columnIndexBuilder.add(statistics, sizeStatistics);
       } else {
         totalStatistics.mergeStatistics(statistics);
-        columnIndexBuilder.add(statistics);
+        columnIndexBuilder.add(statistics, sizeStatistics);
       }
     }
 
@@ -351,6 +390,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
             uncompressedLength,
             compressedLength,
             totalStatistics,
+            totalSizeStatistics,
             columnIndexBuilder,
             offsetIndexBuilder,
             bloomFilter,
@@ -367,6 +407,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
             uncompressedLength,
             compressedLength,
             totalStatistics,
+            totalSizeStatistics,
             columnIndexBuilder,
             offsetIndexBuilder,
             bloomFilter,
