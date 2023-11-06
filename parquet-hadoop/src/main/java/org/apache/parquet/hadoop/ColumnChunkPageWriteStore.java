@@ -29,7 +29,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.zip.CRC32;
 
+import com.sun.tools.corba.se.idl.InvalidArgument;
 import org.apache.parquet.ParquetRuntimeException;
+import org.apache.parquet.Preconditions;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.bytes.ConcatenatingByteArrayCollector;
 import org.apache.parquet.column.ColumnDescriptor;
@@ -120,9 +122,10 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       this.buf = new ConcatenatingByteArrayCollector();
       this.columnIndexBuilder = ColumnIndexBuilder.getBuilder(path.getPrimitiveType(), columnIndexTruncateLength);
       this.offsetIndexBuilder = OffsetIndexBuilder.getBuilder();
+      this.totalSizeStatistics = SizeStatistics.newBuilder(path.getPrimitiveType(),
+        path.getMaxRepetitionLevel(), path.getMaxDefinitionLevel()).build();
       this.pageWriteChecksumEnabled = pageWriteChecksumEnabled;
       this.crc = pageWriteChecksumEnabled ? new CRC32() : null;
-      
       this.headerBlockEncryptor = headerBlockEncryptor;
       this.pageBlockEncryptor = pageBlockEncryptor;
       this.fileAAD = fileAAD;
@@ -228,23 +231,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       this.totalValueCount += valueCount;
       this.pageCount += 1;
 
-      // Copying the statistics if it is not initialized yet so we have the correct typed one
-      if (totalStatistics == null) {
-        totalStatistics = statistics.copy();
-      } else {
-        totalStatistics.mergeStatistics(statistics);
-      }
-
-      assert sizeStatistics != null || totalSizeStatistics == null;
-      if (sizeStatistics != null) {
-        if (totalSizeStatistics == null) {
-          totalSizeStatistics = sizeStatistics.copy();
-        } else {
-          totalSizeStatistics.mergeStatistics(sizeStatistics);
-        }
-      }
-
-      columnIndexBuilder.add(statistics, sizeStatistics);
+      mergeColumnStatistics(statistics, sizeStatistics);
       offsetIndexBuilder.add(toIntWithCheck(tempOutputStream.size() + compressedSize), rowCount,
         sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty());
 
@@ -335,23 +322,7 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
       this.totalValueCount += valueCount;
       this.pageCount += 1;
 
-      // Copying the statistics if it is not initialized yet so we have the correct typed one
-      if (totalStatistics == null) {
-        totalStatistics = statistics.copy();
-      } else {
-        totalStatistics.mergeStatistics(statistics);
-      }
-
-      assert sizeStatistics != null || totalSizeStatistics == null;
-      if (sizeStatistics != null) {
-        if (totalSizeStatistics == null) {
-          totalSizeStatistics = sizeStatistics.copy();
-        } else {
-          totalSizeStatistics.mergeStatistics(sizeStatistics);
-        }
-      }
-
-      columnIndexBuilder.add(statistics, sizeStatistics);
+      mergeColumnStatistics(statistics, sizeStatistics);
       offsetIndexBuilder.add(toIntWithCheck((long) tempOutputStream.size() + compressedSize), rowCount,
         sizeStatistics != null ? sizeStatistics.getUnencodedByteArrayDataBytes() : Optional.empty());
 
@@ -374,6 +345,33 @@ public class ColumnChunkPageWriteStore implements PageWriteStore, BloomFilterWri
                 size);
       }
       return (int)size;
+    }
+
+    private void mergeColumnStatistics(Statistics<?> statistics, SizeStatistics sizeStatistics) {
+      Preconditions.checkState(totalSizeStatistics != null, "Aggregate size statistics should not be null");
+      totalSizeStatistics.mergeStatistics(sizeStatistics);
+      if (!totalSizeStatistics.isValid()) {
+        // Set page size statistics to null to clear state in the ColumnIndexBuilder.
+        sizeStatistics = null;
+      }
+
+      if (totalStatistics != null && totalStatistics.isEmpty()) {
+        return;
+      }
+
+      if (statistics == null || statistics.isEmpty()) {
+        // The column index and statistics should be invalid if some page statistics are null or empty.
+        // See PARQUET-2365 for more details
+        totalStatistics = Statistics.getBuilderForReading(path.getPrimitiveType()).build();
+        columnIndexBuilder = ColumnIndexBuilder.getNoOpBuilder();
+      } else if (totalStatistics == null) {
+        // Copying the statistics if it is not initialized yet, so we have the correct typed one
+        totalStatistics = statistics.copy();
+        columnIndexBuilder.add(statistics, sizeStatistics);
+      } else {
+        totalStatistics.mergeStatistics(statistics);
+        columnIndexBuilder.add(statistics, sizeStatistics);
+      }
     }
 
     @Override

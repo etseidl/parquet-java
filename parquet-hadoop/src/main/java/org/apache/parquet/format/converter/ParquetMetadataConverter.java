@@ -549,7 +549,7 @@ public class ParquetMetadataConverter {
       if (columnMetaData.getEncodingStats() != null) {
         metaData.setEncoding_stats(convertEncodingStats(columnMetaData.getEncodingStats()));
       }
-      if (columnMetaData.getSizeStatistics() != null) {
+      if (columnMetaData.getSizeStatistics() != null && columnMetaData.getSizeStatistics().isValid()) {
         metaData.setSize_statistics(toParquetSizeStatistics(columnMetaData.getSizeStatistics()));
       }
 

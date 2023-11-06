@@ -75,6 +75,13 @@ public class SizeStatistics {
   private List<Long> definitionLevelHistogram;
 
   /**
+   * Whether the statistics has valid value.
+   *
+   * It is true by default. Only set to false while it fails to merge statistics.
+   */
+  private boolean hasValue = true;
+
+  /**
    * Builder to create a SizeStatistics.
    */
   public static class Builder {
@@ -141,6 +148,17 @@ public class SizeStatistics {
   }
 
   /**
+   * Create a builder to create a SizeStatistics.
+   *
+   * @param type physical type of the column associated with this statistics
+   * @param maxRepetitionLevel maximum repetition level of the column
+   * @param maxDefinitionLevel maximum definition level of the column
+   */
+  public static Builder newBuilder(PrimitiveType type, int maxRepetitionLevel, int maxDefinitionLevel) {
+    return new Builder(type, maxRepetitionLevel, maxDefinitionLevel);
+  }
+
+  /**
    * Create a SizeStatistics.
    *
    * @param type physical type of the column associated with this statistics
@@ -163,6 +181,19 @@ public class SizeStatistics {
    * It is used to merge size statistics from all pages of the same column chunk.
    */
   public void mergeStatistics(SizeStatistics other) {
+    if (!hasValue) {
+      return;
+    }
+
+    // Stop merge if other is invalid.
+    if (other == null || !other.isValid()) {
+      hasValue = false;
+      unencodedByteArrayDataBytes = 0L;
+      repetitionLevelHistogram.clear();
+      definitionLevelHistogram.clear();
+      return;
+    }
+
     Preconditions.checkArgument(type.equals(other.type), "Cannot merge SizeStatistics of different types");
     Preconditions.checkArgument(repetitionLevelHistogram.size() == other.repetitionLevelHistogram.size(),
       "Cannot merge repetitionLevelHistogram with different sizes");
@@ -211,6 +242,13 @@ public class SizeStatistics {
   public SizeStatistics copy() {
     return new SizeStatistics(type, unencodedByteArrayDataBytes,
       new LongArrayList(repetitionLevelHistogram), new LongArrayList(definitionLevelHistogram));
+  }
+
+  /**
+   * @return whether the statistics has valid value.
+   */
+  public boolean isValid() {
+    return hasValue;
   }
 
 }

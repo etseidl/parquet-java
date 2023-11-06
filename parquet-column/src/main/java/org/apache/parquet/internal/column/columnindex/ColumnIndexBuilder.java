@@ -504,8 +504,8 @@ public abstract class ColumnIndexBuilder {
   private long minMaxSize;
   private final IntList pageIndexes = new IntArrayList();
   private int nextPageIndex;
-  private final LongList repLevelHistogram = new LongArrayList();
-  private final LongList defLevelHistogram = new LongArrayList();
+  private LongList repLevelHistogram = new LongArrayList();
+  private LongList defLevelHistogram = new LongArrayList();
 
   /**
    * @return a no-op builder that does not collect statistics objects and therefore returns {@code null} at
@@ -650,10 +650,16 @@ public abstract class ColumnIndexBuilder {
       nullPages.add(true);
     }
     nullCounts.add(stats.getNumNulls());
-    if (sizeStats != null) {
+
+    // Collect repetition and definition level histograms only when all pages are valid.
+    if (sizeStats != null && sizeStats.isValid() && repLevelHistogram != null && defLevelHistogram != null) {
       repLevelHistogram.addAll(sizeStats.getRepetitionLevelHistogram());
       defLevelHistogram.addAll(sizeStats.getDefinitionLevelHistogram());
+    } else {
+      repLevelHistogram = null;
+      defLevelHistogram = null;
     }
+
     ++nextPageIndex;
   }
 

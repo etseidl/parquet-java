@@ -37,6 +37,7 @@ import org.apache.parquet.format.DataPageHeader;
 import org.apache.parquet.format.DataPageHeaderV2;
 import org.apache.parquet.format.PageHeader;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
+import org.apache.parquet.hadoop.IndexCache;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
@@ -79,6 +80,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.BINARY;
+import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.DOUBLE;
+import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.FLOAT;
 import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64;
 import static org.apache.parquet.schema.Type.Repetition.OPTIONAL;
 import static org.apache.parquet.schema.Type.Repetition.REPEATED;
@@ -97,18 +100,20 @@ public class ParquetRewriterTest {
   private final int numRecord = 100000;
   private final Configuration conf = new Configuration();
   private final ParquetProperties.WriterVersion writerVersion;
+  private final IndexCache.CacheStrategy indexCacheStrategy;
 
   private List<EncryptionTestFile> inputFiles = null;
   private String outputFile = null;
   private ParquetRewriter rewriter = null;
 
-  @Parameterized.Parameters(name = "WriterVersion = {0}")
-  public static Object[] parameters() {
-    return new Object[] {"v1", "v2"};
+  @Parameterized.Parameters(name = "WriterVersion = {0}, IndexCacheStrategy = {1}")
+  public static Object[][] parameters() {
+    return new Object[][] {{"v1", "NONE"}, {"v1", "PREFETCH_BLOCK"}, {"v2", "NONE"}, {"v2", "PREFETCH_BLOCK"}};
   }
 
-  public ParquetRewriterTest(String writerVersion) {
+  public ParquetRewriterTest(String writerVersion, String indexCacheStrategy) {
     this.writerVersion = ParquetProperties.WriterVersion.fromString(writerVersion);
+    this.indexCacheStrategy = IndexCache.CacheStrategy.valueOf(indexCacheStrategy);
   }
 
   private void testPruneSingleColumnTranslateCodec(List<Path> inputPaths) throws Exception {
@@ -116,24 +121,15 @@ public class ParquetRewriterTest {
     List<String> pruneColumns = Arrays.asList("Gender");
     CompressionCodecName newCodec = CompressionCodecName.ZSTD;
     RewriteOptions.Builder builder = new RewriteOptions.Builder(conf, inputPaths, outputPath);
-    RewriteOptions options = builder.prune(pruneColumns).transform(newCodec).build();
+    RewriteOptions options =
+      builder.prune(pruneColumns).transform(newCodec).indexCacheStrategy(indexCacheStrategy).build();
 
     rewriter = new ParquetRewriter(options);
     rewriter.processBlocks();
     rewriter.close();
 
     // Verify the schema are not changed for the columns not pruned
-    ParquetMetadata pmd = ParquetFileReader.readFooter(conf, new Path(outputFile), ParquetMetadataConverter.NO_FILTER);
-    MessageType schema = pmd.getFileMetaData().getSchema();
-    List<Type> fields = schema.getFields();
-    assertEquals(fields.size(), 3);
-    assertEquals(fields.get(0).getName(), "DocId");
-    assertEquals(fields.get(1).getName(), "Name");
-    assertEquals(fields.get(2).getName(), "Links");
-    List<Type> subFields = fields.get(2).asGroupType().getFields();
-    assertEquals(subFields.size(), 2);
-    assertEquals(subFields.get(0).getName(), "Backward");
-    assertEquals(subFields.get(1).getName(), "Forward");
+    validateSchema();
 
     // Verify codec has been translated
     verifyCodec(outputFile, new HashSet<CompressionCodecName>() {{
@@ -187,24 +183,15 @@ public class ParquetRewriterTest {
     maskColumns.put("Links.Forward", MaskMode.NULLIFY);
     CompressionCodecName newCodec = CompressionCodecName.ZSTD;
     RewriteOptions.Builder builder = new RewriteOptions.Builder(conf, inputPaths, outputPath);
-    RewriteOptions options = builder.prune(pruneColumns).mask(maskColumns).transform(newCodec).build();
+    RewriteOptions options =
+      builder.prune(pruneColumns).mask(maskColumns).transform(newCodec).indexCacheStrategy(indexCacheStrategy).build();
 
     rewriter = new ParquetRewriter(options);
     rewriter.processBlocks();
     rewriter.close();
 
     // Verify the schema are not changed for the columns not pruned
-    ParquetMetadata pmd = ParquetFileReader.readFooter(conf, new Path(outputFile), ParquetMetadataConverter.NO_FILTER);
-    MessageType schema = pmd.getFileMetaData().getSchema();
-    List<Type> fields = schema.getFields();
-    assertEquals(fields.size(), 3);
-    assertEquals(fields.get(0).getName(), "DocId");
-    assertEquals(fields.get(1).getName(), "Name");
-    assertEquals(fields.get(2).getName(), "Links");
-    List<Type> subFields = fields.get(2).asGroupType().getFields();
-    assertEquals(subFields.size(), 2);
-    assertEquals(subFields.get(0).getName(), "Backward");
-    assertEquals(subFields.get(1).getName(), "Forward");
+    validateSchema();
 
     // Verify codec has been translated
     verifyCodec(outputFile, new HashSet<CompressionCodecName>() {{
@@ -263,23 +250,15 @@ public class ParquetRewriterTest {
             EncDecProperties.getFileEncryptionProperties(encryptColumns, ParquetCipher.AES_GCM_CTR_V1, false);
     builder.encrypt(Arrays.asList(encryptColumns)).encryptionProperties(fileEncryptionProperties);
 
+    builder.indexCacheStrategy(indexCacheStrategy);
+
     RewriteOptions options = builder.build();
     rewriter = new ParquetRewriter(options);
     rewriter.processBlocks();
     rewriter.close();
 
     // Verify the schema are not changed for the columns not pruned
-    ParquetMetadata pmd = ParquetFileReader.readFooter(conf, new Path(outputFile), ParquetMetadataConverter.NO_FILTER);
-    MessageType schema = pmd.getFileMetaData().getSchema();
-    List<Type> fields = schema.getFields();
-    assertEquals(fields.size(), 3);
-    assertEquals(fields.get(0).getName(), "DocId");
-    assertEquals(fields.get(1).getName(), "Name");
-    assertEquals(fields.get(2).getName(), "Links");
-    List<Type> subFields = fields.get(2).asGroupType().getFields();
-    assertEquals(subFields.size(), 2);
-    assertEquals(subFields.get(0).getName(), "Backward");
-    assertEquals(subFields.get(1).getName(), "Forward");
+    validateSchema();
 
     // Verify codec has been translated
     FileDecryptionProperties fileDecryptionProperties = EncDecProperties.getFileDecryptionProperties();
@@ -345,7 +324,8 @@ public class ParquetRewriterTest {
 
     List<String> pruneCols = Lists.newArrayList("phoneNumbers");
 
-    RewriteOptions options = builder.mask(maskCols).prune(pruneCols).build();
+    RewriteOptions options =
+      builder.mask(maskCols).prune(pruneCols).indexCacheStrategy(indexCacheStrategy).build();
     rewriter = new ParquetRewriter(options);
     rewriter.processBlocks();
     rewriter.close();
@@ -401,9 +381,13 @@ public class ParquetRewriterTest {
             encryptColumns, ParquetCipher.AES_GCM_CTR_V1, false);
 
     Path outputPath = new Path(outputFile);
-    RewriteOptions options = new RewriteOptions.Builder(conf, inputPaths, outputPath).mask(maskColumns)
-            .transform(CompressionCodecName.ZSTD)
-            .encrypt(Arrays.asList(encryptColumns)).encryptionProperties(fileEncryptionProperties).build();
+    RewriteOptions options = new RewriteOptions.Builder(conf, inputPaths, outputPath)
+      .mask(maskColumns)
+      .transform(CompressionCodecName.ZSTD)
+      .encrypt(Arrays.asList(encryptColumns))
+      .encryptionProperties(fileEncryptionProperties)
+      .indexCacheStrategy(indexCacheStrategy)
+      .build();
 
     rewriter = new ParquetRewriter(options);
     rewriter.processBlocks();
@@ -474,7 +458,7 @@ public class ParquetRewriterTest {
     }
     Path outputPath = new Path(outputFile);
     RewriteOptions.Builder builder = new RewriteOptions.Builder(conf, inputPaths, outputPath);
-    RewriteOptions options = builder.build();
+    RewriteOptions options = builder.indexCacheStrategy(indexCacheStrategy).build();
 
     rewriter = new ParquetRewriter(options);
     rewriter.processBlocks();
@@ -542,7 +526,7 @@ public class ParquetRewriterTest {
     }
     Path outputPath = new Path(outputFile);
     RewriteOptions.Builder builder = new RewriteOptions.Builder(conf, inputPaths, outputPath);
-    RewriteOptions options = builder.build();
+    RewriteOptions options = builder.indexCacheStrategy(indexCacheStrategy).build();
 
     // This should throw an exception because the schemas are different
     rewriter = new ParquetRewriter(options);
@@ -660,6 +644,8 @@ public class ParquetRewriterTest {
       new PrimitiveType(OPTIONAL, INT64, "DocId"),
       new PrimitiveType(REQUIRED, BINARY, "Name"),
       new PrimitiveType(OPTIONAL, BINARY, "Gender"),
+      new PrimitiveType(REPEATED, FLOAT, "FloatFraction"),
+      new PrimitiveType(OPTIONAL, DOUBLE, "DoubleFraction"),
       new GroupType(OPTIONAL, "Links",
         new PrimitiveType(REPEATED, BINARY, "Backward"),
         new PrimitiveType(REPEATED, BINARY, "Forward")));
@@ -699,6 +685,16 @@ public class ParquetRewriterTest {
       if (!prunePaths.contains("Gender") && !nullifiedPaths.contains("Gender")) {
         assertArrayEquals(group.getBinary("Gender", 0).getBytes(),
                 expectGroup.getBinary("Gender", 0).getBytes());
+      }
+
+      if (!prunePaths.contains("FloatFraction") && !nullifiedPaths.contains("FloatFraction")) {
+        assertEquals(group.getFloat("FloatFraction", 0),
+                expectGroup.getFloat("FloatFraction", 0), 0);
+      }
+
+      if (!prunePaths.contains("DoubleFraction") && !nullifiedPaths.contains("DoubleFraction")) {
+        assertEquals(group.getDouble("DoubleFraction", 0),
+                expectGroup.getDouble("DoubleFraction", 0), 0);
       }
 
       Group subGroup = group.getGroup("Links", 0);
@@ -936,5 +932,21 @@ public class ParquetRewriterTest {
     }
 
     return allBloomFilters;
+  }
+
+  private void validateSchema() throws IOException {
+    ParquetMetadata pmd = ParquetFileReader.readFooter(conf, new Path(outputFile), ParquetMetadataConverter.NO_FILTER);
+    MessageType schema = pmd.getFileMetaData().getSchema();
+    List<Type> fields = schema.getFields();
+    assertEquals(fields.size(), 5);
+    assertEquals(fields.get(0).getName(), "DocId");
+    assertEquals(fields.get(1).getName(), "Name");
+    assertEquals(fields.get(2).getName(), "FloatFraction");
+    assertEquals(fields.get(3).getName(), "DoubleFraction");
+    assertEquals(fields.get(4).getName(), "Links");
+    List<Type> subFields = fields.get(4).asGroupType().getFields();
+    assertEquals(subFields.size(), 2);
+    assertEquals(subFields.get(0).getName(), "Backward");
+    assertEquals(subFields.get(1).getName(), "Forward");
   }
 }
