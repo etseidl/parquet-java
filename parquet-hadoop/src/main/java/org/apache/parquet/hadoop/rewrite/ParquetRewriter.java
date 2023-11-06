@@ -464,7 +464,7 @@ public class ParquetRewriter implements Closeable {
                     converter.getEncoding(headerV1.getEncoding()),
                     metaEncryptor,
                     dataPageHeaderAAD,
-                    sizeStatistics);
+                    null);
           } else {
             writer.writeDataPage(toIntWithCheck(headerV1.getNum_values()),
                     pageHeader.getUncompressed_page_size(),
@@ -475,7 +475,7 @@ public class ParquetRewriter implements Closeable {
                     converter.getEncoding(headerV1.getEncoding()),
                     metaEncryptor,
                     dataPageHeaderAAD,
-                    sizeStatistics);
+                    null);
           }
           pageOrdinal++;
           break;
@@ -523,7 +523,7 @@ public class ParquetRewriter implements Closeable {
                   statistics,
                   metaEncryptor,
                   dataPageHeaderAAD,
-                  sizeStatistics);
+                  null);
           pageOrdinal++;
           break;
         default:
